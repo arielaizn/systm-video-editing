@@ -1,0 +1,6 @@
+node_modules/
+*.blend1
+.DS_Store
+fonts/
+*.mp4
+*.wav

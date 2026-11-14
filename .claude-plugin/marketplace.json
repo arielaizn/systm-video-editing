@@ -1,0 +1,5 @@
+{
+  "name": "systm-video-editing",
+  "owner": { "name": "SYSTM" },
+  "plugins": [ { "name": "systm-video-editing", "source": "./", "description": "SYSTM end-to-end video editing: rough cut, captions, SYSTM Depth in Blender." } ]
+}

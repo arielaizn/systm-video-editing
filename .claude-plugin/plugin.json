@@ -1,0 +1,9 @@
+{
+  "name": "systm-video-editing",
+  "version": "1.0.0",
+  "description": "End-to-end short-form video editing the SYSTM way: rough cut, captions, review flow, and SYSTM Depth (image layers composed in 3D in Blender, painted with Codex image_gen, presenter matted with Apple Vision, word-by-word titles, momentum transitions, SFX bank, per-video looks with fixed signature marks).",
+  "author": { "name": "Ariel Aizenshtat / SYSTM" },
+  "homepage": "https://github.com/arielaizn/systm-video-editing",
+  "license": "MIT",
+  "keywords": ["video", "editing", "blender", "reels", "depth", "parallax", "captions", "hebrew", "rtl", "codex", "image-gen"]
+}

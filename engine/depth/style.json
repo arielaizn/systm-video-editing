@@ -1,0 +1,184 @@
+{
+ "_doc": "SYSTM Depth art bible. Every Codex image prompt = base + world.look + role rule + the layer's own prompt. Change the look here, not in plans. looks: כל סרטון בוחר look אחר (plan.look); signature: מה שקבוע בכולם.",
+ "base": "Cinematic film still, photoreal, shot on ARRI Alexa 35, 35mm lens, Kodak Vision3 500T grade, fine film grain, soft halation. Low-key lighting: deep carbon-black shadows (#080c0e) that keep detail, one soft warm-neutral key light, and exactly ONE cool ice-cyan accent light (#acf4f8). Restrained palette: carbon black, graphite, warm off-white paper (#f5f7f7), ice cyan; everything desaturated except skin and the ice accent. Materials: matte off-white ceramic with soft rounded clay-like forms, frosted glass, brushed graphite metal, paper. Premium, quiet, editorial. No text, no letters, no numbers, no logos, no watermark, no people unless asked.",
+ "roles": {
+  "bg": "A full-bleed background plate for a vertical 9:16 video. Deep perspective that recedes far into the distance so a camera can travel into it. Keep the CENTER and UPPER-MIDDLE of the frame calm and empty (a floating object and a title will be composited there later). Nothing touching the camera.",
+  "mid": "A single isolated set piece. TRANSPARENT BACKGROUND with a real alpha channel (PNG). The piece alone, nothing else in the frame, no floor, no backdrop, no cast-shadow plane, fully inside the frame with a margin on every side.",
+  "hero": "One single hero object, the star of the shot, beautifully lit as a premium product shot. TRANSPARENT BACKGROUND with a real alpha channel (PNG). The object alone, nothing else, no floor, no backdrop, no cast-shadow plane, fully inside the frame with a margin on every side.",
+  "card": "One flat physical card, sheet of paper, phone or screen, seen straight-on or slightly angled. TRANSPARENT BACKGROUND with a real alpha channel (PNG). The item alone, fully inside the frame with a margin on every side. Any text on it must be exactly the text given, otherwise blank.",
+  "fg": "A loose foreground element (floating paper sheets, dust motes, glass shards or similar) that will sit very close to the camera and be out of focus. TRANSPARENT BACKGROUND with a real alpha channel (PNG). Nothing else in the frame."
+ },
+ "worlds": {
+  "gallery": "A dark minimalist museum hall: polished black concrete floor with soft reflections, tall graphite walls, low warm pools of light, a thin ice-cyan light strip far in the distance.",
+  "studio": "A dark editorial studio at night: matte graphite desk surfaces, one warm brass desk lamp, a monitor casting a faint ice-cyan glow, deep shadows, light haze.",
+  "archive": "A dark archive corridor of graphite metal shelves and off-white paper files receding into deep perspective, light haze, an ice-cyan light at the far end.",
+  "void": "An infinite carbon-black void with a glossy black floor, soft volumetric haze, a single ice-cyan light from above forming a pool on the floor.",
+  "lab": "A dark brutalist lab of raw concrete and frosted glass panels, cool haze, ice-cyan practical lights set into the walls, warm light on the work surfaces.",
+  "city": "A night city seen from a high window at blue hour, dark and quiet, warm windows, ice-cyan signal lights, haze over the streets."
+ },
+ "defaults": {
+  "depth": {
+   "bg": 30,
+   "mid": 16,
+   "title": 11,
+   "hero": 7,
+   "card": 6,
+   "fg": 3.2
+  },
+  "captionY": 0.775,
+  "titleY": 0.12,
+  "fstop": 4,
+  "presenterTop": 0.52,
+  "presenterHead": 0.18
+ },
+ "signature": {
+  "_doc": "מה שלא משתנה אף פעם, בכל look: אלה סימני הזיהוי של SYSTM. הם חייבים להופיע בכל סרטון.",
+  "accent": "Ice #acf4f8 הוא צבע הדגש היחיד, בכל שכבה, כותרת וכתובית.",
+  "font": "SYSTM Display V2 (הגופן שלנו, לא זמין לאחרים) לכל טקסט.",
+  "line": "מעבר הקו (transition: line) לפחות פעם אחת, עם צליל החתימה.",
+  "sound": "צליל החתימה של SYSTM (sound/sfx/signature) על הקו ובסוף כל סרטון.",
+  "hallmark": "אובייקט החתימה: מונולית קרמיקה אוף-וייט קטן עם תפר Ice דק, מופיע בכל סרטון באחת הפעימות (prompt: 'the SYSTM hallmark: a small matte off-white ceramic monolith with a single thin glowing ice-cyan seam').",
+  "grain": "גרעין קולנועי וצללים קרירים בכל גרייד."
+ },
+ "looks": {
+  "carbon": {
+   "name": "Carbon Lab",
+   "art": "Cinematic dark interiors, raw concrete and frosted glass, practical lights, 35mm film still.",
+   "grade": "curves=r='0/0.02 0.5/0.49 1/0.96':g='0/0.035 0.5/0.5 1/0.96':b='0/0.045 0.5/0.51 1/0.95',vignette=angle=0.42,noise=alls=5:allf=t",
+   "titleY": 0.12,
+   "titleSize": 112,
+   "fstop": 4,
+   "motion": 1,
+   "transitions": [
+    "push",
+    "whip-left",
+    "whip-right",
+    "dive",
+    "flash",
+    "line"
+   ],
+   "music": "dark minimal pulse"
+  },
+  "paper": {
+   "name": "Paper Diorama",
+   "art": "Handmade layered paper-cut diorama, matte off-white and graphite paper layers with visible cut edges and soft paper shadows, miniature scale, tilt-shift macro photography, one ice-cyan paper accent.",
+   "grade": "curves=all='0/0.04 0.5/0.52 1/0.97',eq=saturation=0.85,vignette=angle=0.35,noise=alls=6:allf=t",
+   "titleY": 0.14,
+   "titleSize": 120,
+   "fstop": 2.8,
+   "motion": 0.8,
+   "transitions": [
+    "push",
+    "dive",
+    "whip-down",
+    "line",
+    "dip"
+   ],
+   "music": "soft piano and sub"
+  },
+  "vitrine": {
+   "name": "Museum Vitrine",
+   "art": "Objects presented as museum exhibits inside glass vitrines on dark pedestals, black velvet void, single top spotlights, gallery placards without text, high-end product photography.",
+   "grade": "curves=all='0/0.0 0.5/0.47 1/0.95',eq=contrast=1.08:saturation=0.8,vignette=angle=0.5,noise=alls=4:allf=t",
+   "titleY": 0.1,
+   "titleSize": 104,
+   "fstop": 2.4,
+   "motion": 0.7,
+   "transitions": [
+    "push",
+    "dive",
+    "line",
+    "dip"
+   ],
+   "music": "cinematic tension"
+  },
+  "blueprint": {
+   "name": "Blueprint Model",
+   "art": "Architectural white models and translucent acrylic on dark graphite drafting surfaces, thin technical ice-cyan lines and grid, precise engineering mood, studio macro.",
+   "grade": "curves=b='0/0.06 0.5/0.53 1/0.97',eq=saturation=0.75,vignette=angle=0.38,noise=alls=4:allf=t",
+   "titleY": 0.12,
+   "titleSize": 108,
+   "fstop": 3.2,
+   "motion": 1.1,
+   "transitions": [
+    "whip-left",
+    "whip-right",
+    "whip-up",
+    "push",
+    "line",
+    "flash"
+   ],
+   "music": "minimal tech groove"
+  },
+  "chrome": {
+   "name": "Liquid Chrome",
+   "art": "Polished liquid chrome and smoked glass sculptures floating in a dark void, reflective, studio strip lights reflected as long highlights, premium tech commercial.",
+   "grade": "curves=all='0/0.0 0.5/0.48 1/0.98',eq=contrast=1.1:saturation=0.7,vignette=angle=0.45,noise=alls=4:allf=t",
+   "titleY": 0.11,
+   "titleSize": 116,
+   "fstop": 3.5,
+   "motion": 1.25,
+   "transitions": [
+    "whip-left",
+    "whip-right",
+    "flash",
+    "push",
+    "dive",
+    "line"
+   ],
+   "music": "upbeat electronic"
+  },
+  "nightcity": {
+   "name": "Night Miniature",
+   "art": "A miniature night city model at tilt-shift scale, wet streets, tiny windows lit warm, ice-cyan street lights, haze, viewed like a macro photograph.",
+   "grade": "curves=r='0/0.0 0.5/0.47 1/0.95':b='0/0.05 0.5/0.52 1/0.97',vignette=angle=0.45,noise=alls=6:allf=t",
+   "titleY": 0.13,
+   "titleSize": 112,
+   "fstop": 2.6,
+   "motion": 1.1,
+   "transitions": [
+    "push",
+    "whip-left",
+    "dive",
+    "line",
+    "flash"
+   ],
+   "music": "lo-fi electronic"
+  },
+  "clay": {
+   "name": "Soft Clay",
+   "art": "Everything sculpted in soft matte clay and ceramic, rounded friendly forms, warm-neutral studio light on a dark graphite set, stop-motion feel.",
+   "grade": "curves=all='0/0.03 0.5/0.51 1/0.97',eq=saturation=0.9,vignette=angle=0.35,noise=alls=5:allf=t",
+   "titleY": 0.13,
+   "titleSize": 120,
+   "fstop": 3,
+   "motion": 0.9,
+   "transitions": [
+    "push",
+    "whip-down",
+    "whip-up",
+    "dive",
+    "line"
+   ],
+   "music": "playful minimal"
+  },
+  "monolith": {
+   "name": "Brutal Monolith",
+   "art": "Vast brutalist spaces with monumental graphite monoliths, tiny scale cues, volumetric light shafts, fog, epic architectural photography.",
+   "grade": "curves=all='0/0.0 0.5/0.46 1/0.95',eq=contrast=1.12:saturation=0.7,vignette=angle=0.5,noise=alls=7:allf=t",
+   "titleY": 0.1,
+   "titleSize": 124,
+   "fstop": 4.5,
+   "motion": 1.3,
+   "transitions": [
+    "dive",
+    "push",
+    "flash",
+    "whip-up",
+    "line",
+    "dip"
+   ],
+   "music": "cinematic tension build"
+  }
+ }
+}
