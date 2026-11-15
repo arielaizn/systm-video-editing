@@ -158,7 +158,10 @@ DIRS = {'whip': (-1, 0), 'whip-left': (-1, 0), 'whip-right': (1, 0), 'whip-up': 
 cam_pose, base_z, focus, fstop, flash, pres_off = {}, {}, {}, {}, {}, {}
 for bi, b in enumerate(S['beats']):
     f0, f1, foc, A = b['f0'], b['f1'], b['focus'], b['camera']['amount']
-    mv = b['camera']['move']; tin = b['transition']; tout = b['next']
+    mv = b['camera']['move']; tin_raw = b['transition']; tout_raw = b['next']
+    # object transitions (from the references): 'lens' = the outgoing hero flies into the lens and the new set comes out of
+    # a white haze (camera behaves like dive); 'ice-flash' = the frame fills with Ice and a hot spot (camera like flash)
+    tin = {'lens': 'dive', 'ice-flash': 'flash'}.get(tin_raw, tin_raw); tout = {'lens': 'none', 'ice-flash': 'flash'}.get(tout_raw, tout_raw)
     fw = 2 * hh(foc) * ASPECT; fh = 2 * hh(foc)
     T = (f1 - f0) / FPS
     prev = S['beats'][bi - 1]['presenter'] if bi else 'none'
@@ -195,7 +198,7 @@ for bi, b in enumerate(S['beats']):
         elif tout in ('flash', 'dip') and v > -5: z -= 0.3 * foc * ease_in(1 + v / 5.0)
         cam_pose[f] = (x, y, z, ry, rz)
         focus[f] = max(0.3, foc + z); fstop[f] = fs
-        fl = 0.0; col = 'white' if 'flash' in (tin, tout) or tin == 'dive' else 'black'
+        fl = 0.0; col = 'ice' if 'ice-flash' in (tin_raw, tout_raw) else 'white' if 'flash' in (tin, tout) or tin == 'dive' else 'black'
         if tin in ('flash', 'dip') and u < 4: fl = [1, 0.75, 0.4, 0.15][u]
         if tin == 'dive' and u < 6: fl = [0.85, 0.7, 0.5, 0.3, 0.15, 0.05][u]
         if tout in ('flash', 'dip'): fl = max(fl, {0: 0.6, -1: 0.25}.get(v, 0))
@@ -218,6 +221,7 @@ for f, (x, y, z, ry, rz) in cam_pose.items():
 for b in S['beats']:
     f0, f1 = b['f0'], b['f1']
     label = '%s  %.1f-%.1fs  %s' % (b['id'], (f0 - 1) / FPS, f1 / FPS, b.get('label', ''))
+    hero_id = next((l['id'] for l in b['layers'] if l['role'] in ('hero', 'card')), None)
     for l in b['layers']:
         img = load(l['file']); iw, ih = img.size; asp = iw / max(1, ih)
         coll = collection('Front', label) if l.get('front') else collection('World', label)
@@ -230,17 +234,69 @@ for b in S['beats']:
             ph = l['h'] * 2 * h; pw = ph * asp
         bx, by = l['x'] * h * ASPECT, l['y'] * h
         anim = l['anim']; at = l['at'] if anim != 'none' else f0
-        show_only(o, max(f0, at), (l['out'] + 4) if l['out'] else f1)
+        path = l.get('path') or []; knock = l.get('knock'); swap = l.get('swap')
+        lens = b['next'] == 'lens' and l['id'] == hero_id
+        end = (l['out'] + 4) if l['out'] else f1
         phase = (sum(map(ord, l['id'])) % 100) / 100 * 6.28
-        for f in range(max(f0, at) - 1, f1 + 2):
+
+        def pose(f):
             dx, dy, s, ry, a = entry(anim, f, at) if f < at + ENTRY.get(anim, 8) else (0, 0, 1, 0, 1)
             if l['out'] and f >= l['out']: dx, dy, s, ry, a = exit_(anim, f, l['out'])
             t = f / FPS
             fy = math.sin(t * 2 * math.pi / 3.6 + phase) * 0.015 * ph if l['float'] else 0
             rz = math.radians(1.0) * math.sin(t * 2 * math.pi / 4.4 + phase) if l['float'] else 0
+            rz += math.radians(l.get('roll', 0))
             spin = math.radians(l['spin']) * (f - f0) / FPS
-            zf = (cam_pose[f][2] * 0.85 if (l['role'] == 'fg' and f in cam_pose) else 0) - z   # fg keeps its distance in depth (else the momentum push flies through it)
-            key(o, f, loc=(bx + dx * pw, by + dy * ph + fy, zf), rot=(math.radians(l['tilt']), ry + spin, rz + math.radians(l.get('roll', 0))), scale=(pw * s, ph * s, 1), alpha=a)
+            x, y = bx + dx * pw, by + dy * ph + fy
+            zf = (cam_pose[f][2] * 0.85 if (l['role'] == 'fg' and f in cam_pose) else 0) - z   # fg keeps its distance in depth
+            if path:   # the actor travels between its points, easing in and out of each, and dips on a click
+                if f <= path[0]['f']: px, py = path[0]['x'], path[0]['y']
+                elif f >= path[-1]['f']: px, py = path[-1]['x'], path[-1]['y']
+                else:
+                    for q0, q1 in zip(path, path[1:]):
+                        if q0['f'] <= f <= q1['f']:
+                            u = (f - q0['f']) / max(1, q1['f'] - q0['f']); u = u * u * (3 - 2 * u)
+                            px, py = lerp(q0['x'], q1['x'], u), lerp(q0['y'], q1['y'], u); break
+                x, y = px * h * ASPECT + dx * pw, py * h + dy * ph
+                for q in path:
+                    if q['click'] and -1 <= f - q['f'] <= 4: s *= 1 - 0.2 * (1 - abs(f - q['f'] - 1) / 3.0)
+            if knock and f >= knock['f']:   # knocked: it tips, falls and tumbles out, a little toward the lens
+                u = (f - knock['f']) / FPS; d = knock['dir']
+                x += d * 0.7 * h * u; y -= 3.2 * h * u * u + 0.25 * h * u; rz -= d * 2.6 * u
+                zf += (1.8 if knock.get('follow') else 0.6) * z * min(1.0, u)
+            if lens and f > f1 - 8:      # the hero flies into the lens and fills the frame
+                u = ease_in((f - (f1 - 8)) / 8.0); cz = cam_pose[f][2] if f in cam_pose else 0
+                zf = lerp(zf, cz - 0.35, u); x = lerp(x, cam_pose[f][0] if f in cam_pose else 0, u); y = lerp(y, (cam_pose[f][1] if f in cam_pose else 0), u)
+            return (x, y, zf), (math.radians(l['tilt']), ry + spin, rz), (pw * s, ph * s, 1), a
+
+        show_only(o, max(f0, at), end)
+        frames = range(max(f0, at) - 1, f1 + 2)
+        o2 = None
+        if swap:   # state change: the new painted state fades in over the original, then replaces it
+            o2 = plane(l['id'] + '-state', material(l['id'] + '-state', load(swap['file']), l['gain'] * (1 + swap.get('glow', 0.35))), coll)
+            show_only(o2, swap['f'], end)
+        for f in frames:
+            loc, rot, scl, a = pose(f)
+            if o2 is not None and f >= swap['f'] - 1:
+                k2 = ease_out((f - swap['f']) / 6.0)
+                key(o2, f, loc=(loc[0], loc[1], loc[2] + 0.002), rot=rot, scale=scl, alpha=a * k2)
+            key(o, f, loc=loc, rot=rot, scale=scl, alpha=a)
+        if l.get('swarm'):   # copies fly at the lens from deep in the set, tumbling (the references' opening)
+            import random
+            rnd = random.Random(sum(map(ord, l['id'])))
+            for i in range(int(l['swarm'])):
+                c = plane('%s-swarm%d' % (l['id'], i), material('%s-sw%d' % (l['id'], i), img, l['gain']), coll)
+                z0 = z + 4 + rnd.random() * 14; v = 5 + rnd.random() * 7
+                cx, cy = (rnd.random() * 2 - 1) * 1.3, (rnd.random() * 2 - 1) * 1.4
+                r0, rv = rnd.random() * 6.28, (rnd.random() - 0.5) * 3
+                f_in = max(f0, at) + int(rnd.random() * 10)
+                show_only(c, f_in, f1)
+                for f in range(f_in - 1, f1 + 2):
+                    t = (f - f_in) / FPS; zi = z0 - v * t; cz = cam_pose[f][2] if f in cam_pose else 0
+                    dist = -zi - cz
+                    al = 0.0 if dist > -0.45 else clamp((t * FPS) / 4.0)
+                    hz = hh(max(0.5, zi))
+                    key(c, f, loc=(cx * hz * ASPECT, cy * hz, -zi), rot=(0.3 * math.sin(r0 + t), rv * t * 0.4, r0 + rv * t), scale=(pw * 0.55, ph * 0.55, 1), alpha=al)
     t = b['title']
     if t and t['space'] == 'world':   # title in space: builds word by word, leaves with the set
         z = t['z']; adv = max(0.0, -min(base_z[f] for f in range(f0, f1 + 1)))
@@ -306,7 +362,7 @@ for c in S['captions']:            # captions build word by word
             key(o, f, loc=(0, y - (6 * k * (1 - ease_out(u)) if si == 0 else 0), -DT), scale=(pw, ph, 1), alpha=ease_out(u) if si == 0 else 1)
 if any(v[0] > 0 for v in flash.values()):
     hf = hh(1.1)
-    for col, rgb in (('white', (0.96, 0.97, 0.97, 1)), ('black', (0.0, 0.0, 0.0, 1))):
+    for col, rgb in (('white', (0.96, 0.97, 0.97, 1)), ('black', (0.0, 0.0, 0.0, 1)), ('ice', (0.674, 0.957, 0.973, 1))):
         vals = {f: v[0] for f, v in flash.items() if v[1] == col}
         if not any(vals.values()): continue
         o = plane('flash-' + col, material('flash-' + col, None, 1.0, 'BLENDED', solid=rgb), tc, cam)

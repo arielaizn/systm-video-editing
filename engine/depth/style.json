@@ -6,7 +6,8 @@
   "mid": "A single isolated set piece. TRANSPARENT BACKGROUND with a real alpha channel (PNG). The piece alone, nothing else in the frame, no floor, no backdrop, no cast-shadow plane, fully inside the frame with a margin on every side.",
   "hero": "One single hero object, the star of the shot, beautifully lit as a premium product shot. TRANSPARENT BACKGROUND with a real alpha channel (PNG). The object alone, nothing else, no floor, no backdrop, no cast-shadow plane, fully inside the frame with a margin on every side.",
   "card": "One flat physical card, sheet of paper, phone or screen, seen straight-on or slightly angled. TRANSPARENT BACKGROUND with a real alpha channel (PNG). The item alone, fully inside the frame with a margin on every side. Any text on it must be exactly the text given, otherwise blank.",
-  "fg": "A loose foreground element (floating paper sheets, dust motes, glass shards or similar) that will sit very close to the camera and be out of focus. TRANSPARENT BACKGROUND with a real alpha channel (PNG). Nothing else in the frame."
+  "fg": "A loose foreground element (floating paper sheets, dust motes, glass shards or similar) that will sit very close to the camera and be out of focus. TRANSPARENT BACKGROUND with a real alpha channel (PNG). Nothing else in the frame.",
+  "actor": "A single small isolated object on a transparent background, crisp, studio lit, no shadow on the ground."
  },
  "worlds": {
   "gallery": "A dark minimalist museum hall: polished black concrete floor with soft reflections, tall graphite walls, low warm pools of light, a thin ice-cyan light strip far in the distance.",
@@ -23,7 +24,8 @@
    "title": 11,
    "hero": 7,
    "card": 6,
-   "fg": 3.2
+   "fg": 3.2,
+   "actor": 4.2
   },
   "captionY": 0.775,
   "titleY": 0.12,

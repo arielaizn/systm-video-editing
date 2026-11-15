@@ -54,3 +54,14 @@ Source: 7 reference reels built from image pieces in 3D space (Blender + an imag
 - A new scene every 2.8–4s.
 - A visual event (entrance, transition, word) every 1–1.5s.
 - No beat longer than 6s; something always moves.
+
+## 8. Sets, acts and an actor (second pass over the references)
+Full notes: `scene-grammar.md`.
+- **Every beat is a new place.** The background never stays: desk at night, café, vault, print shop, rooftop. The hero object sits *inside* the set, on a surface left clear for it.
+- **2–3 acts with their own palette.** The problem lives in warm or dusty darkness; the solution arrives in bright daylight (light oak, white walls, a plant). The jump into the last act is an `ice-flash`.
+- **An actor drives the events.** A frosted-glass cursor with an Ice edge (`role: "actor"`) travels on a `path` and clicks on the word it stands for. What it touches reacts:
+  - `swap`: the same object in a new state (gears light up, the phone shows "paid");
+  - `knock`: the object is pushed, falls and tumbles, sometimes toward the lens (`follow`);
+  - `swarm`: copies of an object fly through space into the camera.
+- **Transitions born from objects:** `lens` (the previous hero flies into the camera and becomes the cut), `ice-flash` (an Ice flash for the turning point).
+- **Hot titles:** a title builds in Ice word by word, cools to white after 0.45s, and only the key word stays Ice.

@@ -7,6 +7,7 @@
 //   check                                        validate plan.json, print the beat table
 //   layers   [--jobs 3] [--only b2] [--redo b2-hero]  paint missing layers with Codex -> edit/depth/layers/ + sheet
 //   text                                         titles, captions and CTA as PNGs (SYSTM Display V2, RTL) -> edit/depth/text/
+//   autoplan [--look name]                       Claude writes plan.json by itself (systm-depth-plan skill), a look not used recently
 //   words                                        transcribe src.mp4 itself (exact word times on the cut)
 //   stills   [--preview] [--at 3.2,8]           frames (all 4 passes stacked) -> edit/depth/stills/sheet.jpg
 //   finish   [--preview] [--no-sfx]              stack passes, grade, voice + SFX + music bed (sound bank) -> depth-vN.mp4
@@ -206,6 +207,8 @@ async function layers(dir, args) {
     // objects get the anchor for light and grade; backgrounds only when asked (the model copies its composition otherwise)
     const useAnchor = l.anchor ?? (l.role !== 'bg');
     const refs = out !== anchor && fs.existsSync(anchor) && useAnchor ? [anchor] : [];
+    // a state image (cracked, infected, lit...) is painted FROM its original, so it is the same object in a new state
+    if (l.ref) { const rf = D(dir, 'layers', `${l.ref.includes('-') ? l.ref : `${b.id}-${l.ref}`}.png`); if (fs.existsSync(rf)) refs.unshift(rf); }
     const t0 = Date.now();
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
@@ -225,9 +228,10 @@ async function layers(dir, args) {
   log(`layers ${path.basename(dir)}: ${todo.length} to paint, ${jobs} at a time`);
   const first = todo.find((x) => x.out === anchor);
   if (first) await one(first);
-  const rest = todo.filter((x) => x !== first); const failed = [];
-  let i = 0;
-  await Promise.all(Array.from({ length: Math.min(jobs, rest.length) }, async () => { while (i < rest.length) { const x = rest[i++]; await one(x).catch((e) => failed.push(e.message)); } }));
+  const failed = [];
+  const wave = async (list) => { let i = 0; await Promise.all(Array.from({ length: Math.min(jobs, list.length) }, async () => { while (i < list.length) { const x = list[i++]; await one(x).catch((e) => failed.push(e.message)); } })); };
+  await wave(todo.filter((x) => x !== first && !x.l.ref));
+  await wave(todo.filter((x) => x !== first && x.l.ref));
   sheetLayers(dir, p);
   if (failed.length) die(failed.join('\n'));
 }
@@ -287,7 +291,7 @@ async function text(dir) {
   .pill{display:inline-block;margin-top:18px;background:#acf4f8;color:#080c0e;border-radius:999px;padding:8px 56px 14px;font-weight:900;font-size:108px;text-shadow:none;box-shadow:0 10px 40px rgba(172,244,248,.25)}`;
   // every state of a line is rendered with the full line laid out and the not-yet-said words hidden,
   // so words never jump while the line builds (RTL, centered)
-  const lineHtml = (words, n, accent, cls, fs_) => `<div class="${cls}" style="--fs:${fs_}px">${words.map((w, i) => `<span class="${[i === accent ? 'ice' : '', i >= n ? 'ghost' : ''].join(' ')}">${esc(w)}</span>`).join(' ')}</div>`;
+  const lineHtml = (words, n, accent, cls, fs_, hot) => `<div class="${cls}" style="--fs:${fs_}px">${words.map((w, i) => `<span class="${[i === accent || hot ? 'ice' : '', i >= n ? 'ghost' : ''].join(' ')}">${esc(w)}</span>`).join(' ')}</div>`;
   const items = []; const titles = {};
   for (const b of p.beats) {
     const tt = b.title; if (!tt?.text && !tt?.pill) continue;
@@ -295,10 +299,12 @@ async function text(dir) {
     const acc = tt.accent ? Math.max(ws.findIndex((w) => norm(w) === norm(tt.accent)), ws.findIndex((w) => norm(w).includes(norm(tt.accent)))) : -1;
     const n = tt.build === false ? 1 : Math.max(1, ws.length);
     titles[b.id] = [];
-    for (let k = 1; k <= n; k++) {
-      const shown = tt.build === false ? ws.length : k;
-      const last = k === n;
-      const html = `${tt.kicker ? `<div class="k">${esc(tt.kicker)}</div>` : ''}${ws.length ? lineHtml(ws, shown, acc, 't', tt.size || STYLE.looks?.[p.look]?.titleSize || 112) : ''}${tt.pill ? `<div class="${last ? '' : 'ghost'}"><span class="pill">${esc(tt.pill)}</span></div>` : ''}`;
+    // hot accent (from the references): the line builds in Ice, then cools to white and only the key word stays Ice
+    const hot = tt.hot ?? p.hotTitles ?? true;
+    for (let k = 1; k <= n + (hot ? 1 : 0); k++) {
+      const shown = tt.build === false || k > n ? ws.length : k;
+      const last = k >= n;
+      const html = `${tt.kicker ? `<div class="k">${esc(tt.kicker)}</div>` : ''}${ws.length ? lineHtml(ws, shown, acc, 't', tt.size || STYLE.looks?.[p.look]?.titleSize || 112, hot && k <= n) : ''}${tt.pill ? `<div class="${last ? '' : 'ghost'}"><span class="pill">${esc(tt.pill)}</span></div>` : ''}`;
       const id = `title-${b.id}-${k}`; items.push({ id, html }); titles[b.id].push(id);
     }
   }
@@ -324,7 +330,7 @@ async function text(dir) {
 }
 
 // ---------- scene + render ----------
-const ROLE_ORDER = ['bg', 'mid', 'title', 'card', 'hero', 'fg'];
+const ROLE_ORDER = ['bg', 'mid', 'title', 'card', 'hero', 'fg', 'actor'];
 function sceneJson(dir, { preview }) {
   const { p, errs } = validate(dir); if (errs.length) { check(dir); die('fix the plan first'); }
   const tx = readJson(D(dir, 'text', 'index.json'), { items: {}, captions: [], titles: {} });
@@ -335,16 +341,23 @@ function sceneJson(dir, { preview }) {
   const beats = p.beats.map((b, bi) => {
     const f0 = fr(b.start), f1 = fr(b.end) - 1;
     const solo = b.presenter === 'none';
-    const layers = (b.layers || []).map((l) => {
+    const byId = Object.fromEntries((b.layers || []).map((l) => [l.id, l]));
+    const layers = (b.layers || []).filter((l) => !l.hidden).map((l) => {
       const file = layerFile(dir, b, l);
       if (!fs.existsSync(file)) die(`layer missing: ${path.relative(dir, file)} (run layers)`);
       // default layout (fractions from the top): title 12-25%, hero 26-51%, speaker's head from 52%, caption on the chest at 77%
       const yDef = { hero: solo ? -0.02 : 0.24, card: solo ? -0.02 : 0.24 }[l.role] ?? 0;
-      const hDef = { bg: 0, mid: 0.7, hero: solo ? 0.4 : 0.25, card: solo ? 0.4 : 0.26, fg: 0.5 }[l.role];
+      const hDef = { bg: 0, mid: 0.7, hero: solo ? 0.4 : 0.25, card: solo ? 0.4 : 0.26, fg: 0.5, actor: 0.075 }[l.role];
       return { id: `${b.id}-${l.id}`, role: l.role, file, z: l.z ?? def[l.role], x: l.x ?? 0, y: l.y ?? yDef, h: l.h ?? hDef,
-        anim: l.anim || (l.role === 'hero' ? 'pop' : l.role === 'card' ? 'flip' : l.role === 'bg' ? 'none' : l.role === 'fg' ? 'slide-left' : 'rise'),
+        anim: l.anim || (l.role === 'actor' ? 'fade' : l.role === 'hero' ? 'pop' : l.role === 'card' ? 'flip' : l.role === 'bg' ? 'none' : l.role === 'fg' ? 'slide-left' : 'rise'),
         at: fr(b.start + (l.at || 0)), out: l.out != null ? fr(b.start + l.out) : null, spin: l.spin || 0, tilt: l.tilt || 0, roll: l.roll || 0,
-        gain: l.gain ?? 1, float: l.float ?? (l.role === 'hero' || l.role === 'card'), front: l.front ?? (l.role === 'fg') };
+        gain: l.gain ?? 1, float: l.float ?? (l.role === 'hero' || l.role === 'card'), front: l.front ?? (l.role === 'fg' || l.role === 'actor'),
+        // actions (from the references): a path the layer travels (the actor cursor), clicks, a knock that sends it falling,
+        // a state change to another painted image, a swarm of copies flying at the lens
+        path: l.path?.map((q) => ({ f: fr(b.start + q.t), x: q.x, y: q.y, click: !!q.click })) || null,
+        knock: l.knock ? { f: fr(b.start + l.knock.at), dir: l.knock.dir || 1, follow: !!l.knock.follow } : null,
+        swap: l.swap ? { f: fr(b.start + l.swap.at), file: layerFile(dir, b, byId[l.swap.layer] || { id: l.swap.layer }), glow: l.swap.glow ?? 0.35 } : null,
+        swarm: l.swarm || 0 };
     });
     // title: one state per word, each landing on the spoken word when it is said in this beat, else staggered
     let title = null;
@@ -355,7 +368,7 @@ function sceneJson(dir, { preview }) {
       let t = b.start + (tt.at || 0); const times = [];
       states.forEach((_, k) => {
         const w = ws[k] && spoken.find((x) => norm(x.t).length >= 2 && (norm(x.t).includes(norm(ws[k])) || norm(ws[k]).includes(norm(x.t))) && x.s >= t - 0.05);
-        t = w && k > 0 ? Math.max(t + 0.12, w.s) : k === 0 ? t : t + 0.22;
+        t = k >= ws.length && k > 0 ? t + 0.45 : w && k > 0 ? Math.max(t + 0.12, w.s) : k === 0 ? t : t + 0.22;
         times.push(Math.min(t, b.end - 0.2));
       });
       title = { space: tt.space || (b.presenter === 'full' ? 'screen' : 'world'), z: tt.z ?? def.title, y: tt.y ?? LOOK.titleY ?? STYLE.defaults.titleY,
@@ -420,7 +433,7 @@ function blender(dir, args, extra, s) {
     let outp = '';
     ch.stdout.on('data', (d) => { outp += d; }); ch.stderr.on('data', (d) => { outp += d; });
     ch.on('close', (code) => {
-      const tag = extra.includes('--pass') ? extra[extra.indexOf('--pass') + 1] : 'all';
+      const tag = (extra.includes('--pass') ? extra[extra.indexOf('--pass') + 1] : 'all') + (extra.includes('--start') ? `-${extra[extra.indexOf('--start') + 1]}` : '');
       fs.writeFileSync(D(dir, `blender-${tag}.log`), outp);
       for (const l of outp.split('\n')) if (/^(depth:|Traceback)/.test(l) || /Error:/.test(l)) console.log(l);
       code ? reject(new Error(`blender ${tag} failed (see edit/depth/blender-${tag}.log)`)) : resolve(s);
@@ -432,6 +445,20 @@ const PASSES = ['world', 'presenter', 'front', 'text'];
 async function renderPasses(dir, args, out, extra) {
   const s = sceneJson(dir, { preview: args.includes('--preview') });
   const only = opt(args, '--passes', null)?.split(',');
+  // the world pass (the heavy one) is split into chunks rendered in parallel: Eevee on Apple silicon leaves the GPU
+  // a third idle with one process (measured on an M3: 12 -> 25 frames a minute with 3 chunks)
+  const chunks = Number(opt(args, '--chunks', 3));
+  if (chunks > 1 && !extra.includes('--stills') && (!only || only.includes('world'))) {
+    const a = extra.includes('--start') ? Number(extra[extra.indexOf('--start') + 1]) : 1;
+    const z = extra.includes('--end') ? Number(extra[extra.indexOf('--end') + 1]) : s.frames;
+    const rest = extra.filter((x, i) => !['--start', '--end'].includes(x) && !['--start', '--end'].includes(extra[i - 1]));
+    const n = Math.max(1, Math.min(chunks, Math.ceil((z - a + 1) / 60))); const step = Math.ceil((z - a + 1) / n);
+    fs.mkdirSync(path.join(out, 'world'), { recursive: true });
+    const jobs = Array.from({ length: n }, (_, k) => blender(dir, args, ['--pass', 'world', '--out', path.join(out, 'world'), '--start', String(a + k * step), '--end', String(Math.min(z, a + (k + 1) * step - 1)), ...rest], s));
+    jobs.push(...PASSES.filter((ps) => ps !== 'world' && (!only || only.includes(ps))).map((ps) => { fs.mkdirSync(path.join(out, ps), { recursive: true }); return blender(dir, args, ['--pass', ps, '--out', path.join(out, ps), ...extra], s); }));
+    await Promise.all(jobs);
+    return s;
+  }
   await Promise.all(PASSES.filter((ps) => !only || only.includes(ps)).map((ps) => { fs.mkdirSync(path.join(out, ps), { recursive: true }); return blender(dir, args, ['--pass', ps, '--out', path.join(out, ps), ...extra], s); }));
   return s;
 }
@@ -455,7 +482,8 @@ async function stills(dir, args) {
   await renderPasses(dir, args, out, ['--stills', fs_.join(',')]);
   const files = fs_.map((f) => { const n = `${String(f).padStart(5, '0')}.png`; const dst = path.join(out, n); stack(out, n, dst); return dst; });
   const cols = Math.min(6, files.length);
-  sh('ffmpeg', ['-y', '-v', 'error', ...files.flatMap((f) => ['-i', f]), '-filter_complex', `${files.map((_, k) => `[${k}]scale=270:480[s${k}]`).join(';')};${files.map((_, k) => `[s${k}]`).join('')}xstack=inputs=${files.length}:layout=${files.map((_, k) => `${(k % cols) * 276}_${Math.floor(k / cols) * 486}`).join('|')}:fill=black`, '-frames:v', '1', '-q:v', '3', path.join(out, 'sheet.jpg')]);
+  if (files.length === 1) sh('ffmpeg', ['-y', '-v', 'error', '-i', files[0], '-vf', 'scale=270:480', '-frames:v', '1', '-q:v', '3', path.join(out, 'sheet.jpg')]);
+  else sh('ffmpeg', ['-y', '-v', 'error', ...files.flatMap((f) => ['-i', f]), '-filter_complex', `${files.map((_, k) => `[${k}]scale=270:480[s${k}]`).join(';')};${files.map((_, k) => `[s${k}]`).join('')}xstack=inputs=${files.length}:layout=${files.map((_, k) => `${(k % cols) * 276}_${Math.floor(k / cols) * 486}`).join('|')}:fill=black`, '-frames:v', '1', '-q:v', '3', path.join(out, 'sheet.jpg')]);
   console.log(path.join(out, 'sheet.jpg'));
 }
 async function render(dir, args) {
@@ -582,8 +610,41 @@ async function words(dir) {
   log(`words ${path.basename(dir)}: ${ws.length} words (${used})`);
 }
 
+// plan by itself: Claude (headless) writes plan.json with the systm-depth-plan skill, in a look not used recently
+const PLUGIN = path.join(os.homedir(), '.claude/local-marketplaces/content-os-marketplace/plugins/systm-depth');
+function pickLook(dir) {
+  const looks = Object.keys(STYLE.looks || {}); if (!looks.length) return null;
+  const used = [];
+  for (const id of fs.readdirSync(P('projects'))) {
+    const f = path.join(P('projects'), id, 'edit', 'depth', 'plan.json'); if (path.join(P('projects'), id) === dir || !fs.existsSync(f)) continue;
+    const pl = readJson(f, {}); if (pl.look) used.push([fs.statSync(f).mtimeMs, pl.look]);
+  }
+  used.sort((a, b) => b[0] - a[0]); const recent = used.slice(0, looks.length - 1).map((x) => x[1]);
+  const free = looks.filter((l) => !recent.includes(l));
+  return (free.length ? free : looks)[Math.floor(Math.random() * (free.length || looks.length))];
+}
+async function autoplan(dir, args) {
+  const look = opt(args, '--look', null) || readJson(D(dir, 'plan.json'), {}).look || pickLook(dir);
+  if (!fs.existsSync(D(dir, 'transcript.txt'))) die('no transcript (run words first)');
+  const prompt = [
+    `Plan a SYSTM Depth edit, end to end, with no questions. Project: ${dir}.`,
+    `Follow the skill ${PLUGIN}/skills/systm-depth-plan/SKILL.md exactly, with ${PLUGIN}/references/depth.md (the plan.json contract), ${PLUGIN}/references/motion-grammar.md and ${P('research/depth-refs/bgstudy/findings.md')}.`,
+    `Inputs: ${D(dir, 'transcript.txt')} and ${D(dir, 'words.json')} (word times). Look for this video: "${look}" (from ${path.join(HERE, 'style.json')}).`,
+    `Write ${D(dir, 'plan.json')} (keep "duration" as it is, set "look": "${look}"), then run: node ${path.join(HERE, 'depth.mjs')} check ${dir}  — and fix until it prints "plan ok".`,
+    'Also write a short notes.md next to the plan (acts, actor, the beat table). Do not paint, render or publish anything.',
+  ].join('\n');
+  log(`autoplan ${path.basename(dir)}: look ${look}`);
+  await new Promise((resolve, reject) => {
+    const ch = spawn('claude', ['-p', prompt, '--permission-mode', 'acceptEdits', '--allowedTools', 'Read,Write,Edit,Glob,Grep,Bash(node:*),Bash(ls:*),Bash(cat:*),Bash(python3:*)', '--add-dir', PLUGIN], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+    let o = ''; ch.stdout.on('data', (d) => { o += d; }); ch.stderr.on('data', (d) => { o += d; });
+    ch.on('close', (c) => { fs.writeFileSync(D(dir, 'autoplan.log'), o); c ? reject(new Error('autoplan failed (edit/depth/autoplan.log)')) : resolve(); });
+  });
+  const { errs } = validate(dir); if (errs.length) die(`autoplan left errors:\n${errs.join('\n')}`);
+  log(`autoplan ${path.basename(dir)}: plan ok`);
+}
+
 const cmds = {
-  init: (d, a) => init(d, a), words: (d) => words(d), matte: (d, a) => matte(d, a), check: (d) => check(d), layers: (d, a) => layers(d, a), text: (d) => text(d),
+  init: (d, a) => init(d, a), words: (d) => words(d), autoplan: (d, a) => autoplan(d, a), matte: (d, a) => matte(d, a), check: (d) => check(d), layers: (d, a) => layers(d, a), text: (d) => text(d),
   stills: (d, a) => stills(d, a), render: (d, a) => render(d, a), finish: (d, a) => finish(d, a), open: (d, a) => openBlend(d, a),
   async run(d, a) { await layers(d, a); await text(d); await render(d, a); finish(d, a); },
 };
